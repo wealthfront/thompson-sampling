@@ -9,20 +9,18 @@ public class BatchedThompsonSamplingTest {
   @Test
   public void testUpdate() {
     BatchedThompsonSampling bandit = new BatchedThompsonSampling(2);
-    bandit.update(Lists.newArrayList(new ArmPerformance(1, 2), new ArmPerformance(3, 4)));
-    assertEquals(Lists.newArrayList(new ArmPerformance(1, 2), new ArmPerformance(3, 4)), bandit.performances);
-    bandit.update(Lists.newArrayList(new ArmPerformance(1, 2), new ArmPerformance(3, 4)));
-    assertEquals(Lists.newArrayList(new ArmPerformance(2, 4), new ArmPerformance(6, 8)), bandit.performances);
+    bandit.update(Lists.newArrayList(new ObservedArmPerformance(1, 2), new ObservedArmPerformance(3, 4)));
+    assertEquals(Lists.newArrayList(new ObservedArmPerformance(1, 2), new ObservedArmPerformance(3, 4)), bandit.performances);
+    bandit.update(Lists.newArrayList(new ObservedArmPerformance(1, 2), new ObservedArmPerformance(3, 4)));
+    assertEquals(Lists.newArrayList(new ObservedArmPerformance(2, 4), new ObservedArmPerformance(6, 8)), bandit.performances);
     try {
-      bandit.update(Lists.newArrayList(new ArmPerformance(1, 2), new ArmPerformance(3, 4), new ArmPerformance(5, 6)));
+      bandit.update(Lists.newArrayList(new ObservedArmPerformance(1, 2), new ObservedArmPerformance(3, 4), new ObservedArmPerformance(5, 6)));
       fail("Expecting IllegalArgumentException");
     } catch (IllegalArgumentException e) { }
   }
 
-
-
   @Test
-  public void testGetArmWeights() {
+  public void testGetBanditStatistics() {
 
   }
 }

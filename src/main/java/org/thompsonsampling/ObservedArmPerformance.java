@@ -1,6 +1,6 @@
 package org.thompsonsampling;
 
-public class ArmPerformance {
+public class ObservedArmPerformance {
   public long getSuccesses() {
     return successes;
   }
@@ -12,13 +12,13 @@ public class ArmPerformance {
   private final long successes;
   private final long failures;
 
-  public ArmPerformance(long successes, long failures) {
+  public ObservedArmPerformance(long successes, long failures) {
     this.successes = successes;
     this.failures = failures;
   }
 
-  public ArmPerformance add(ArmPerformance that) {
-    return new ArmPerformance(successes + that.successes, failures + that.failures);
+  public ObservedArmPerformance add(ObservedArmPerformance that) {
+    return new ObservedArmPerformance(successes + that.successes, failures + that.failures);
   }
 
   @Override
@@ -28,8 +28,8 @@ public class ArmPerformance {
 
   @Override
   public boolean equals(Object obj) {
-    if (obj instanceof ArmPerformance) {
-      ArmPerformance that = (ArmPerformance)obj;
+    if (obj instanceof ObservedArmPerformance) {
+      ObservedArmPerformance that = (ObservedArmPerformance)obj;
       return successes == that.successes && failures == that.failures;
     }
     return false;
