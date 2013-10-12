@@ -12,22 +12,18 @@ import org.apache.commons.math3.stat.descriptive.rank.Percentile;
 import java.util.Date;
 import java.util.List;
 
-public class BatchedThompsonSampling implements BatchedBandit {
-  final List<ObservedArmPerformance> performances;
+public class BatchedThompsonSampling extends BaseBatchedBandit {
   private int numberOfDraws = 10000;
   private RandomEngine randomEngine = new MersenneTwister(new Date());
   private double confidenceLevel = 0.95;
   private double experimentValueQuitLevel = 0.01;
 
   public BatchedThompsonSampling(List<ObservedArmPerformance> performances) {
-    this.performances = performances;
+    super(performances);
   }
 
   public BatchedThompsonSampling(int numberOfArms) {
-    this(Lists.<ObservedArmPerformance>newArrayListWithCapacity(numberOfArms));
-    for (int i = 0; i < numberOfArms; i++) {
-      performances.add(new ObservedArmPerformance(0, 0));
-    }
+    super(numberOfArms);
   }
 
   public RandomEngine getRandomEngine() {
@@ -60,22 +56,6 @@ public class BatchedThompsonSampling implements BatchedBandit {
 
   public void setExperimentValueQuitLevel(double experimentValueQuitLevel) {
     this.experimentValueQuitLevel = experimentValueQuitLevel;
-  }
-
-  @Override
-  public List<ObservedArmPerformance> getPerformances() {
-    return performances;
-  }
-
-  @Override
-  public void update(List<ObservedArmPerformance> newPerformances) {
-    if (newPerformances == null || newPerformances.size() != performances.size()) {
-      throw new IllegalArgumentException(String.format("Wrong number of arms given: expected %d.",
-          performances.size()));
-    }
-    for (int i = 0; i < newPerformances.size(); i++) {
-      performances.set(i, performances.get(i).add(newPerformances.get(i)));
-    }
   }
 
   @Override

@@ -68,12 +68,19 @@ public class BatchedThompsonSamplingTest {
       iteration++;
     }
     int winningArm = currentStatistics.getVictoriousArm().get();
+    ObservedArmPerformance loserPerf = batchedBandit.getPerformances().get(0);
+    ObservedArmPerformance winnerPerf = batchedBandit.getPerformances().get(1);
+    double conversionRate = (loserPerf.getSuccesses() + winnerPerf.getSuccesses()) * 1.0 /
+        (loserPerf.getFailures() + loserPerf.getSuccesses() + winnerPerf.getFailures() + winnerPerf.getSuccesses());
+    double regret = (0.015 - conversionRate) / 0.015;
     System.out.println(String.format("Final iteration: %d", iteration));
     System.out.println(String.format("\tWinning arm: %d", winningArm));
-    System.out.println(String.format("\tLosing arm (success, failure):  %s", batchedBandit.getPerformances().get(0)));
-    System.out.println(String.format("\tWinning arm (success, failure): %s", batchedBandit.getPerformances().get(1)));
+    System.out.println(String.format("\tLosing arm (success, failure):  %s", loserPerf));
+    System.out.println(String.format("\tWinning arm (success, failure): %s", winnerPerf));
     System.out.println(String.format("\tLosing arm weight:  %.2f", currentStatistics.getArmWeights().get(0)));
     System.out.println(String.format("\tWinning arm weight: %.2f", currentStatistics.getArmWeights().get(1)));
+    System.out.println(String.format("\tConversion rate: %.4f", conversionRate));
+    System.out.println(String.format("\tRegret:          %.4f", regret));
     assertEquals(1, winningArm);
   }
 }
