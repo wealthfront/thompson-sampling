@@ -9,8 +9,8 @@ public class ObservedArmPerformance {
     return failures;
   }
 
-  private final long successes;
-  private final long failures;
+  private long successes;
+  private long failures;
 
   public ObservedArmPerformance(long successes, long failures) {
     this.successes = successes;
@@ -18,7 +18,19 @@ public class ObservedArmPerformance {
   }
 
   public ObservedArmPerformance add(ObservedArmPerformance that) {
-    return new ObservedArmPerformance(successes + that.successes, failures + that.failures);
+    successes = successes + that.successes;
+    failures = failures + that.failures;
+    return this;
+  }
+
+  public ObservedArmPerformance addSuccess() {
+    successes = successes + 1;
+    return this;
+  }
+
+  public ObservedArmPerformance addFailure() {
+    failures = failures + 1;
+    return this;
   }
 
   @Override

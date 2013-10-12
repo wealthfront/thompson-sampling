@@ -4,7 +4,9 @@ import java.util.List;
 
 public interface BatchedBandit {
 
-  public void update(List<ObservedArmPerformance> performances);
+  public List<ObservedArmPerformance> getPerformances();
 
-  BanditStatistics getBanditStatistics();
+  public void update(List<ObservedArmPerformance> newPerformances);
+
+  public BanditStatistics getBanditStatistics();
 }

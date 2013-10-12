@@ -14,6 +14,20 @@ public class ObservedArmPerformanceTest {
   }
 
   @Test
+  public void testAddSuccess() {
+    ObservedArmPerformance a1 = new ObservedArmPerformance(2, 3);
+    a1.addSuccess();
+    assertEquals(new ObservedArmPerformance(3, 3), a1);
+  }
+
+  @Test
+  public void testAddFailure() {
+    ObservedArmPerformance a1 = new ObservedArmPerformance(2, 3);
+    a1.addFailure();
+    assertEquals(new ObservedArmPerformance(2, 4), a1);
+  }
+
+  @Test
   public void testToString()  {
     assertEquals("(2,3)", new ObservedArmPerformance(2, 3).toString());
   }

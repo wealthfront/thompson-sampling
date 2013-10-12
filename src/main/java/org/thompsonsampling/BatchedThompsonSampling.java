@@ -63,6 +63,11 @@ public class BatchedThompsonSampling implements BatchedBandit {
   }
 
   @Override
+  public List<ObservedArmPerformance> getPerformances() {
+    return performances;
+  }
+
+  @Override
   public void update(List<ObservedArmPerformance> newPerformances) {
     if (newPerformances == null || newPerformances.size() != performances.size()) {
       throw new IllegalArgumentException(String.format("Wrong number of arms given: expected %d.",
@@ -110,9 +115,9 @@ public class BatchedThompsonSampling implements BatchedBandit {
       }
       armWeights.add(weight);
     }
-    if (bestWeight > confidenceLevel) {
+    /*if (bestWeight > confidenceLevel) {
       return new BanditStatistics(armWeights, Optional.of(bestArm));
-    }
+    }*/
     double[] valueRemaining = new double[numberOfDraws];
     for (int i = 0; i < numberOfDraws; i++) {
       double maxValue = -1.0;
