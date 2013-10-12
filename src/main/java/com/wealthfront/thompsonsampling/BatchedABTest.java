@@ -1,8 +1,7 @@
-package org.thompsonsampling;
+package com.wealthfront.thompsonsampling;
 
 import cern.jet.random.engine.MersenneTwister;
 import cern.jet.random.engine.RandomEngine;
-import com.google.common.collect.Lists;
 
 import java.util.Date;
 import java.util.List;

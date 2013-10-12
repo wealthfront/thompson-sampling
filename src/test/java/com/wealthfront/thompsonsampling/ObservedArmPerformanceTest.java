@@ -1,4 +1,4 @@
-package org.thompsonsampling;
+package com.wealthfront.thompsonsampling;
 
 import org.junit.Test;
 

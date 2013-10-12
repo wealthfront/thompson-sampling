@@ -1,4 +1,4 @@
-package org.thompsonsampling;
+package com.wealthfront.thompsonsampling;
 
 public class ObservedArmPerformance {
   public long getSuccesses() {
