@@ -9,4 +9,6 @@ public interface BatchedBandit {
   public void update(List<ObservedArmPerformance> newPerformances);
 
   public BanditStatistics getBanditStatistics();
+
+  public double cumulativeRegret(double bestArmPerformance);
 }

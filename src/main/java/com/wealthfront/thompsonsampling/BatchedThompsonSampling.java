@@ -17,6 +17,7 @@ public class BatchedThompsonSampling extends BaseBatchedBandit {
   private RandomEngine randomEngine = new MersenneTwister(new Date());
   private double confidenceLevel = 0.95;
   private double experimentValueQuitLevel = 0.01;
+  private int minimumConversionsPerArm = 5;
 
   public BatchedThompsonSampling(List<ObservedArmPerformance> performances) {
     super(performances);
@@ -58,6 +59,14 @@ public class BatchedThompsonSampling extends BaseBatchedBandit {
     this.experimentValueQuitLevel = experimentValueQuitLevel;
   }
 
+  public int getMinimumConversionsPerArm() {
+    return minimumConversionsPerArm;
+  }
+
+  public void setMinimumConversionsPerArm(int minimumConversionsPerArm) {
+    this.minimumConversionsPerArm = minimumConversionsPerArm;
+  }
+
   @Override
   public BanditStatistics getBanditStatistics() {
     int n = performances.size();
@@ -95,9 +104,9 @@ public class BatchedThompsonSampling extends BaseBatchedBandit {
       }
       armWeights.add(weight);
     }
-    /*if (bestWeight > confidenceLevel) {
+    if (bestWeight > confidenceLevel) {
       return new BanditStatistics(armWeights, Optional.of(bestArm));
-    }*/
+    }
     double[] valueRemaining = new double[numberOfDraws];
     for (int i = 0; i < numberOfDraws; i++) {
       double maxValue = -1.0;
