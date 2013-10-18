@@ -10,5 +10,5 @@ public interface BatchedBandit {
 
   public BanditStatistics getBanditStatistics();
 
-  public double cumulativeRegret(double bestArmPerformance);
+  public double cumulativeRegret(double bestArmPerformance, List<Double> allPerformances);
 }

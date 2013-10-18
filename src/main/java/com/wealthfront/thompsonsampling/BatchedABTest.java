@@ -3,17 +3,14 @@ package com.wealthfront.thompsonsampling;
 import cern.jet.random.engine.MersenneTwister;
 import cern.jet.random.engine.RandomEngine;
 import com.google.common.base.Optional;
-import com.google.common.base.Predicate;
-import com.google.common.collect.FluentIterable;
 import com.google.common.collect.Lists;
 
 import java.util.Date;
 import java.util.List;
 
-import static java.lang.Math.abs;
 import static java.lang.Math.sqrt;
 import static java.lang.Math.round;
-import static cern.jet.stat.Probability.studentTInverse;
+import static cern.jet.stat.Probability.chiSquare;
 
 public class BatchedABTest extends BaseBatchedBandit {
   private List<Double> weights;
@@ -22,6 +19,7 @@ public class BatchedABTest extends BaseBatchedBandit {
   private double baselineConversionRate = 0.01;
   private double minimumDetectableEffect = 0.05;
   private double statisticalPower = 0.80;
+  private boolean requiresMinSamples = true;
 
   public BatchedABTest(List<ObservedArmPerformance> performances) {
     super(performances);
@@ -89,63 +87,70 @@ public class BatchedABTest extends BaseBatchedBandit {
     this.statisticalPower = statisticalPower;
   }
 
+  public boolean requiresMinSamples() {
+    return requiresMinSamples;
+  }
+
+  public void setRequiresMinSamples(boolean requiresMinSamples) {
+    this.requiresMinSamples = requiresMinSamples;
+  }
+
   private double square(double x) {
     return x * x;
   }
 
   private int numberOfSamples() {
     double variance = baselineConversionRate * (1 - baselineConversionRate);
-    double delta_squared = square(baselineConversionRate * minimumDetectableEffect);
-    double half_alpha = (1.0 - confidenceLevel) / 2.0;
-    double beta = (1.0 - statisticalPower);
-    double n = 16 * variance / delta_squared;
-    double change = 2.0;
-    while (change >= 0.05) {
-      double next = 2.0 * square(studentTInverse(half_alpha, (int)round(n)-1) + studentTInverse(beta, (int)round(n)-1))
-          * variance / delta_squared;
-      change = abs(next - n);
-      n = next;
-    }
+    double deltaSquared = square(baselineConversionRate * minimumDetectableEffect);
+    double n = 16 * variance / deltaSquared;
     return (int)round(n);
    }
 
   @Override
   public BanditStatistics getBanditStatistics() {
-    int n = numberOfSamples();
-    for (ObservedArmPerformance p : performances) {
-      if (p.getFailures() + p.getSuccesses() < n) {
-        return new BanditStatistics(weights, Optional.<Integer>absent());
+    if (requiresMinSamples) {
+      int n = numberOfSamples();
+      for (ObservedArmPerformance p : performances) {
+        if (p.getFailures() + p.getSuccesses() < n) {
+          return new BanditStatistics(weights, Optional.<Integer>absent());
+        }
       }
     }
     int t = performances.size();
-    List<Double> conversions = Lists.newArrayList();
-    List<Double> variances = Lists.newArrayList();
     int bestArm = -1;
     double bestConversion = -1.0;
-    double bestVariance = 10000000000.0;
+    List<Long> groupTotals = Lists.newArrayList();
+    long totalSuccesses = 0;
+    long totalFailures = 0;
     for (int i = 0; i < t; i++) {
-      ObservedArmPerformance perf = performances.get(i);
-      long samples = perf.getFailures() + perf.getSuccesses();
-      double conversion = 1.0 * perf.getSuccesses() / samples;
-      conversions.add(conversion);
-      double variance = conversion * (1.0 - conversion) / samples;
-      variances.add(variance);
+      ObservedArmPerformance p = performances.get(i);
+      totalSuccesses += p.getSuccesses();
+      totalFailures += p.getFailures();
+      long total = totalSuccesses + totalFailures;
+      groupTotals.add(total);
+      double conversion = p.getSuccesses() * 1.0 / (p.getFailures() + p.getSuccesses());
       if (conversion > bestConversion) {
         bestConversion = conversion;
         bestArm = i;
-        bestVariance = variance;
       }
     }
+    long totalSamples = totalSuccesses + totalFailures;
+    double chiSquared = 0.0;
     for (int i = 0; i < t; i++) {
-      if (i == bestArm) {
-        continue;
-      }
-      double zScore = (bestConversion - conversions.get(i)) /
-          sqrt(bestVariance + variances.get(i));
-      if (zScore < 0.95) {
+      ObservedArmPerformance p = performances.get(i);
+      double samples = 1.0 * (p.getFailures() + p.getSuccesses());
+      double expectedFailure = samples * totalFailures / totalSamples;
+      double expectedSuccess = samples * totalSuccesses / totalSamples;
+      if (expectedFailure < 5 || expectedSuccess < 5) {
         return new BanditStatistics(weights, Optional.<Integer>absent());
       }
+      double failFactor = square(p.getFailures() - expectedFailure) / expectedFailure;
+      double successFactor = square(p.getSuccesses() - expectedSuccess) / expectedSuccess;
+      chiSquared += failFactor + successFactor;
     }
-    return new BanditStatistics(weights, Optional.of(bestArm));
+    if (chiSquare(1.0, chiSquared) >= confidenceLevel) {
+      return new BanditStatistics(weights, Optional.of(bestArm));
+    }
+    return new BanditStatistics(weights, Optional.<Integer>absent());
   }
 }

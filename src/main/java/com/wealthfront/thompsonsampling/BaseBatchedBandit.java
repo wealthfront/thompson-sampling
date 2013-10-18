@@ -30,18 +30,20 @@ public abstract class BaseBatchedBandit implements BatchedBandit {
           performances.size()));
     }
     for (int i = 0; i < newPerformances.size(); i++) {
-      performances.set(i, performances.get(i).add(newPerformances.get(i)));
+      ObservedArmPerformance newPerf = newPerformances.get(i);
+      performances.set(i, performances.get(i).add(newPerf));
     }
   }
 
   @Override
-  public double cumulativeRegret(double bestArmPerformance) {
-    double success = 0.0;
-    double total = 0.0;
-    for (ObservedArmPerformance p : performances) {
-      success += p.getSuccesses() * 1.0;
-      total += (p.getFailures() + p.getSuccesses()) * 1.0;
+  public double cumulativeRegret(double bestArmPerformance, List<Double> allPerformances) {
+    int arms = allPerformances.size();
+    double cumulativeRegret = 0.0;
+    for (int j = 0; j < arms; j++) {
+      long samples = performances.get(j).getFailures() + performances.get(j).getSuccesses();
+      double armLoss = samples * (bestArmPerformance - allPerformances.get(j));
+      cumulativeRegret += armLoss;
     }
-    return (bestArmPerformance - (success / total)) * total / bestArmPerformance;
+    return cumulativeRegret;
   }
 }

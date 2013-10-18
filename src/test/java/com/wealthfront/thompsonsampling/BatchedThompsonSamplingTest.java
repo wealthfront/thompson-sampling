@@ -34,14 +34,13 @@ public class BatchedThompsonSamplingTest {
       BatchedThompsonSampling batchedBandit = new BatchedThompsonSampling(2);
       batchedBandit.setRandomEngine(engine);
       BatchedBanditTester tester = new BatchedBanditTester(batchedBandit, engine);
-      //System.out.println(tester.getIterations() + ", " + batchedBandit.cumulativeRegret(0.015));
       if (i % 100 == 0) {
-        System.out.println(i);
+        System.out.println("Batches complete " + i);
       }
       correct += tester.getWinningArm();
     }
     System.out.println(correct);
-    assertTrue(correct > 9900);
+    assertTrue(correct > 9500);
   }
 
   @Test
@@ -53,23 +52,21 @@ public class BatchedThompsonSamplingTest {
       BatchedThompsonSampling batchedBandit = new BatchedThompsonSampling(2);
       batchedBandit.setRandomEngine(engine);
       BatchedBanditTester tester = new BatchedBanditTester(batchedBandit, engine);
-      double regret = batchedBandit.cumulativeRegret(0.015);
-      //System.out.println(tester.getIterations() + ", " + batchedBandit.cumulativeRegret(0.015));
+      double regret = batchedBandit.cumulativeRegret(0.015, Lists.newArrayList(0.01, 0.015));
       maxBanditIterations = max(maxBanditIterations, tester.getIterations());
       maxBanditRegret = max(maxBanditRegret, regret);
       assertEquals(1, tester.getWinningArm());
     }
     int minAbIterations = Integer.MAX_VALUE;
-    double minAbRegret = 0.0;
+    double minAbRegret = Double.MAX_VALUE;
     for (int i = 51; i<= 60; i++) {
       RandomEngine engine = new MersenneTwister(i);
       BatchedABTest batchedBandit = new BatchedABTest(2);
       batchedBandit.setRandomEngine(engine);
       BatchedBanditTester tester = new BatchedBanditTester(batchedBandit, engine);
-      double regret = batchedBandit.cumulativeRegret(0.015);
-      //System.out.println(tester.getIterations() + ", " + batchedBandit.cumulativeRegret(0.015));
+      double regret = batchedBandit.cumulativeRegret(0.015, Lists.newArrayList(0.01, 0.015));
       minAbIterations = min(minAbIterations, tester.getIterations());
-      minAbRegret = max(minAbRegret, regret);
+      minAbRegret = min(minAbRegret, regret);
       assertEquals(1, tester.getWinningArm());
     }
     System.out.println("Min A/B regret: " + minAbRegret);
