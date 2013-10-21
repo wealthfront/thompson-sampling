@@ -19,4 +19,8 @@ public class BernouliArm {
     }
     return true;
   }
+
+  public double getConversionRate() {
+    return conversionRate;
+  }
 }

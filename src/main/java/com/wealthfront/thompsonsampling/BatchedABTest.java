@@ -8,16 +8,17 @@ import com.google.common.collect.Lists;
 import java.util.Date;
 import java.util.List;
 
-import static java.lang.Math.sqrt;
+import static cern.jet.stat.Probability.normalInverse;
 import static java.lang.Math.round;
 import static cern.jet.stat.Probability.chiSquare;
+import static java.lang.Math.sqrt;
 
 public class BatchedABTest extends BaseBatchedBandit {
   private List<Double> weights;
   private RandomEngine randomEngine = new MersenneTwister(new Date());
   private double confidenceLevel = 0.95;
-  private double baselineConversionRate = 0.01;
-  private double minimumDetectableEffect = 0.05;
+  private double baselineConversionRate = 0.04;
+  private double minimumDetectableEffect = 0.1;
   private double statisticalPower = 0.80;
   private boolean requiresMinSamples = true;
 
@@ -100,9 +101,17 @@ public class BatchedABTest extends BaseBatchedBandit {
   }
 
   private int numberOfSamples() {
-    double variance = baselineConversionRate * (1 - baselineConversionRate);
-    double deltaSquared = square(baselineConversionRate * minimumDetectableEffect);
-    double n = 16 * variance / deltaSquared;
+    double p = baselineConversionRate;
+    double delta = baselineConversionRate * minimumDetectableEffect;
+    double alpha = 1.0 - confidenceLevel;
+    double beta = 1.0 - statisticalPower;
+    double v1 = p * (1 - p);
+    double v2 = (p + delta) * (1 - p - delta);
+    double sd1 = sqrt(2 * v1);
+    double sd2 = sqrt(v1 + v2);
+    double tAlpha2 = normalInverse(alpha / 2.0);
+    double tBeta = normalInverse(beta);
+    double n = square(tAlpha2 * sd1 + tBeta * sd2) / square(delta);
     return (int)round(n);
    }
 
@@ -151,6 +160,10 @@ public class BatchedABTest extends BaseBatchedBandit {
     if (chiSquare(1.0, chiSquared) >= confidenceLevel) {
       return new BanditStatistics(weights, Optional.of(bestArm));
     }
-    return new BanditStatistics(weights, Optional.<Integer>absent());
+    if (requiresMinSamples) {
+      return new BanditStatistics(weights, Optional.of(bestArm));
+    } else {
+      return new BanditStatistics(weights, Optional.<Integer>absent());
+    }
   }
 }

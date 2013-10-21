@@ -69,6 +69,48 @@ public class BatchedThompsonSamplingTest {
       minAbRegret = min(minAbRegret, regret);
       assertEquals(1, tester.getWinningArm());
     }
+    /*System.out.println("Min A/B regret: " + minAbRegret);
+    System.out.println("Max Bandit regret: " + maxBanditRegret);
+    System.out.println("Min A/B # batches (batch size = 100 samples): " + minAbIterations);
+    System.out.println("Max Bandit # batches (batch size = 100 samples): " + maxBanditIterations);*/
+  }
+
+  @Test
+  public void testPerformance2() {
+    int maxBanditIterations = 0;
+    double maxBanditRegret = 0.0;
+    for (int i = 51; i<= 60; i++) {
+      RandomEngine engine = new MersenneTwister(i);
+      BatchedThompsonSampling batchedBandit = new BatchedThompsonSampling(6);
+      batchedBandit.setRandomEngine(engine);
+      BatchedBanditTester tester = new BatchedBanditTester(batchedBandit, engine,
+          Lists.newArrayList(new BernouliArm(0.04, engine),
+              new BernouliArm(0.05, engine),
+              new BernouliArm(0.045, engine),
+              new BernouliArm(0.03, engine),
+              new BernouliArm(0.02, engine),
+              new BernouliArm(0.035, engine)));
+      double regret = batchedBandit.cumulativeRegret(0.05, Lists.newArrayList(0.04, 0.05, 0.045, 0.03, 0.02, 0.035));
+      maxBanditIterations = max(maxBanditIterations, tester.getIterations());
+      maxBanditRegret = max(maxBanditRegret, regret);
+    }
+    int minAbIterations = Integer.MAX_VALUE;
+    double minAbRegret = Double.MAX_VALUE;
+    for (int i = 51; i<= 60; i++) {
+      RandomEngine engine = new MersenneTwister(i);
+      BatchedABTest batchedBandit = new BatchedABTest(6);
+      batchedBandit.setRandomEngine(engine);
+      BatchedBanditTester tester = new BatchedBanditTester(batchedBandit, engine,
+          Lists.newArrayList(new BernouliArm(0.04, engine),
+              new BernouliArm(0.05, engine),
+              new BernouliArm(0.045, engine),
+              new BernouliArm(0.03, engine),
+              new BernouliArm(0.02, engine),
+              new BernouliArm(0.035, engine)));
+      double regret = batchedBandit.cumulativeRegret(0.05, Lists.newArrayList(0.04, 0.05, 0.045, 0.03, 0.02, 0.35));
+      minAbIterations = min(minAbIterations, tester.getIterations());
+      minAbRegret = min(minAbRegret, regret);
+    }
     System.out.println("Min A/B regret: " + minAbRegret);
     System.out.println("Max Bandit regret: " + maxBanditRegret);
     System.out.println("Min A/B # batches (batch size = 100 samples): " + minAbIterations);

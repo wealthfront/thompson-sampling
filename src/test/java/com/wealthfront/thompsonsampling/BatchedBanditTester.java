@@ -1,31 +1,42 @@
 package com.wealthfront.thompsonsampling;
 
 import cern.jet.random.engine.RandomEngine;
+import com.google.common.base.Function;
 import com.google.common.base.Optional;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Ordering;
 
 import java.util.List;
+
+import static com.google.common.primitives.Doubles.max;
 
 public class BatchedBanditTester {
   private final BatchedBandit bandit;
   private final RandomEngine randomEngine;
   private int iteration;
   private int winningArm;
+  private double cumulativeRegret;
 
   public BatchedBanditTester(BatchedBandit bandit, RandomEngine engine) {
+    this(bandit, engine, Lists.newArrayList(new BernouliArm(0.01, engine), new BernouliArm(0.015, engine)));
+  }
+
+  public BatchedBanditTester(BatchedBandit bandit, RandomEngine engine, List<BernouliArm> arms) {
     this.bandit = bandit;
     this.randomEngine = engine;
-    BernouliArm loser = new BernouliArm(0.01, engine);
-    BernouliArm winner = new BernouliArm(0.015, engine);
-    List<BernouliArm> arms = Lists.newArrayList(loser, winner);
-    BanditStatistics currentStatistics = new BanditStatistics(Lists.newArrayList(
-        new Double(0.5), new Double(0.5)), Optional.<Integer>absent());
+    List<Double> armWeights = Lists.newArrayList();
+    for (int i = 0; i < arms.size(); i++) {
+      armWeights.add(new Double(1.0 / arms.size()));
+    }
+    BanditStatistics currentStatistics = new BanditStatistics(armWeights, Optional.<Integer>absent());
     Optional<Integer> victoriousArm = currentStatistics.getVictoriousArm();
     iteration = 0;
     while (!victoriousArm.isPresent()) {
-      List<ObservedArmPerformance> batchPerformances = Lists.newArrayList(
-          new ObservedArmPerformance(0, 0),
-          new ObservedArmPerformance(0, 0));
+      List<ObservedArmPerformance> batchPerformances = Lists.newArrayList();
+      for (int i = 0; i < arms.size(); i++) {
+        batchPerformances.add(new ObservedArmPerformance(0, 0));
+      }
       for (int i = 0; i < 100; i++) {
         int arm = currentStatistics.pickArm(engine);
         if (arms.get(arm).draw()) {
@@ -40,6 +51,13 @@ public class BatchedBanditTester {
       iteration++;
     }
     winningArm = currentStatistics.getVictoriousArm().get();
+    List<Double> trueConversions = Lists.newArrayList();
+    double trueWinner = -1.0;
+    for (int i = 0; i < arms.size(); i++) {
+      trueWinner = max(trueWinner, arms.get(i).getConversionRate());
+      trueConversions.add(arms.get(i).getConversionRate());
+    }
+    cumulativeRegret = bandit.cumulativeRegret(trueWinner, trueConversions);
   }
 
   public int getIterations() {
@@ -48,5 +66,9 @@ public class BatchedBanditTester {
 
   public int getWinningArm() {
     return winningArm;
+  }
+
+  public double getCumulativeRegret() {
+    return cumulativeRegret;
   }
 }
