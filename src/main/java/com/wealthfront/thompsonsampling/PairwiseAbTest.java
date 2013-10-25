@@ -5,21 +5,17 @@ import com.google.common.collect.Lists;
 
 import java.util.List;
 
-public class PairwiseAbTest extends BaseBatchedBandit {
+public class PairwiseAbTest implements BatchedBandit {
 
-  private BatchedABTest current = new BatchedABTest(2);
+  private BatchedABTest current = new BatchedABTest();
   private List<Integer> currentArms = Lists.newArrayList(0, 1);
   private int next = 2;
   private int numberOfArms;
 
-  public PairwiseAbTest(int numberOfArms) {
-    super(numberOfArms);
-    this.numberOfArms = numberOfArms;
-  }
-
   @Override
-  public BanditStatistics getBanditStatistics() {
-    BanditStatistics results = current.getBanditStatistics();
+  public BanditStatistics getBanditStatistics(BanditPerformance performance) {
+    numberOfArms = performance.getPerformances().size();
+    BanditStatistics results = current.getBanditStatistics(performance);
     if (results.getVictoriousArm().isPresent()) {
       int winner = results.getVictoriousArm().get();
       if (currentArms.contains(numberOfArms - 1)) {
@@ -30,7 +26,7 @@ public class PairwiseAbTest extends BaseBatchedBandit {
         } else {
           currentArms.set(0, next);
         }
-        current = new BatchedABTest(2);
+        current = new BatchedABTest();
         next++;
       }
     }
@@ -49,11 +45,4 @@ public class PairwiseAbTest extends BaseBatchedBandit {
     return resultWeights;
   }
 
-  @Override
-  public void update(List<ObservedArmPerformance> newPerformances) {
-    super.update(newPerformances);
-    List<ObservedArmPerformance> filtered = Lists.newArrayList(newPerformances.get(currentArms.get(0)),
-        newPerformances.get(currentArms.get(1)));
-    current.update(filtered);
-  }
 }

@@ -13,32 +13,14 @@ import static java.lang.Math.round;
 import static cern.jet.stat.Probability.chiSquare;
 import static java.lang.Math.sqrt;
 
-public class BatchedABTest extends BaseBatchedBandit {
-  private List<Double> weights;
+public class BatchedABTest implements BatchedBandit {
   private RandomEngine randomEngine = new MersenneTwister(new Date());
   private double confidenceLevel = 0.95;
-  private double baselineConversionRate = 0.04;
-  private double minimumDetectableEffect = 0.1;
+  private double baselineConversionRate = 0.01;
+  private double minimumDetectableEffect = 0.5;
   private double statisticalPower = 0.80;
   private boolean requiresMinSamples = true;
 
-  public BatchedABTest(List<ObservedArmPerformance> performances) {
-    super(performances);
-    setWeights();
-  }
-
-  public BatchedABTest(int numberOfArms) {
-    super(numberOfArms);
-    setWeights();
-  }
-
-  private void setWeights() {
-    weights = Lists.newArrayList();
-    int n = performances.size();
-    for (int i = 0; i < n; i++) {
-      weights.add(1.0 / n);
-    }
-  }
 
   public RandomEngine getRandomEngine() {
     return randomEngine;
@@ -62,14 +44,6 @@ public class BatchedABTest extends BaseBatchedBandit {
 
   public void setBaselineConversionRate(double baselineConversionRate) {
     this.baselineConversionRate = baselineConversionRate;
-  }
-
-  public List<Double> getWeights() {
-    return weights;
-  }
-
-  public void setWeights(List<Double> weights) {
-    this.weights = weights;
   }
 
   public double getMinimumDetectableEffect() {
@@ -115,13 +89,22 @@ public class BatchedABTest extends BaseBatchedBandit {
     return (int)round(n);
    }
 
+  private List<Double> getWeights(int arms) {
+    List<Double> weights = Lists.newArrayListWithCapacity(arms);
+    for (int i = 0; i < arms; i++) {
+      weights.add(1.0 / arms);
+    }
+    return weights;
+  }
+
   @Override
-  public BanditStatistics getBanditStatistics() {
+  public BanditStatistics getBanditStatistics(BanditPerformance performance) {
+    List<ObservedArmPerformance> performances = performance.getPerformances();
     if (requiresMinSamples) {
       int n = numberOfSamples();
       for (ObservedArmPerformance p : performances) {
         if (p.getFailures() + p.getSuccesses() < n) {
-          return new BanditStatistics(weights, Optional.<Integer>absent());
+          return new BanditStatistics(getWeights(performances.size()), Optional.<Integer>absent());
         }
       }
     }
@@ -151,19 +134,19 @@ public class BatchedABTest extends BaseBatchedBandit {
       double expectedFailure = samples * totalFailures / totalSamples;
       double expectedSuccess = samples * totalSuccesses / totalSamples;
       if (expectedFailure < 5 || expectedSuccess < 5) {
-        return new BanditStatistics(weights, Optional.<Integer>absent());
+        return new BanditStatistics(getWeights(performances.size()), Optional.<Integer>absent());
       }
       double failFactor = square(p.getFailures() - expectedFailure) / expectedFailure;
       double successFactor = square(p.getSuccesses() - expectedSuccess) / expectedSuccess;
       chiSquared += failFactor + successFactor;
     }
     if (chiSquare(1.0, chiSquared) >= confidenceLevel) {
-      return new BanditStatistics(weights, Optional.of(bestArm));
+      return new BanditStatistics(getWeights(performances.size()), Optional.of(bestArm));
     }
     if (requiresMinSamples) {
-      return new BanditStatistics(weights, Optional.of(bestArm));
+      return new BanditStatistics(getWeights(performances.size()), Optional.of(bestArm));
     } else {
-      return new BanditStatistics(weights, Optional.<Integer>absent());
+      return new BanditStatistics(getWeights(performances.size()), Optional.<Integer>absent());
     }
   }
 }

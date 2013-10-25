@@ -32,6 +32,7 @@ public class BatchedBanditTester {
     BanditStatistics currentStatistics = new BanditStatistics(armWeights, Optional.<Integer>absent());
     Optional<Integer> victoriousArm = currentStatistics.getVictoriousArm();
     iteration = 0;
+    BanditPerformance performance = new BanditPerformance(arms.size());
     while (!victoriousArm.isPresent()) {
       List<ObservedArmPerformance> batchPerformances = Lists.newArrayList();
       for (int i = 0; i < arms.size(); i++) {
@@ -45,8 +46,8 @@ public class BatchedBanditTester {
           batchPerformances.get(arm).addFailure();
         }
       }
-      bandit.update(batchPerformances);
-      currentStatistics = bandit.getBanditStatistics();
+      performance.update(batchPerformances);
+      currentStatistics = bandit.getBanditStatistics(performance);
       victoriousArm = currentStatistics.getVictoriousArm();
       iteration++;
     }
@@ -57,7 +58,7 @@ public class BatchedBanditTester {
       trueWinner = max(trueWinner, arms.get(i).getConversionRate());
       trueConversions.add(arms.get(i).getConversionRate());
     }
-    cumulativeRegret = bandit.cumulativeRegret(trueWinner, trueConversions);
+    cumulativeRegret = performance.cumulativeRegret(trueWinner, trueConversions);
   }
 
   public int getIterations() {

@@ -8,6 +8,18 @@
   <artifactId>thompson-sampling</artifactId>
   <packaging>jar</packaging>
   <version>1.0-SNAPSHOT</version>
+  <distributionManagement>
+    <snapshotRepository>
+      <id>wealthfront-snapshots</id>
+      <name>Wealthfront Snapshots</name>
+      <url>http://maven.wlth.fr:8088/nexus/content/repositories/wealthfront-snapshots/</url>
+    </snapshotRepository>
+    <repository>
+      <id>wealthfront-releases</id>
+      <name>Wealthfront Releases</name>
+      <url>http://maven.wlth.fr:8088/nexus/content/repositories/wealthfront-releases/</url>
+    </repository>
+  </distributionManagement>
   <dependencies>
     <dependency>
       <groupId>colt</groupId>

@@ -4,11 +4,6 @@ import java.util.List;
 
 public interface BatchedBandit {
 
-  public List<ObservedArmPerformance> getPerformances();
+  public BanditStatistics getBanditStatistics(BanditPerformance performance);
 
-  public void update(List<ObservedArmPerformance> newPerformances);
-
-  public BanditStatistics getBanditStatistics();
-
-  public double cumulativeRegret(double bestArmPerformance, List<Double> allPerformances);
 }

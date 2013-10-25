@@ -1,6 +1,7 @@
 package com.wealthfront.thompsonsampling;
 
 import cern.jet.random.engine.RandomEngine;
+import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 
 import java.util.List;
@@ -32,5 +33,15 @@ public class BanditStatistics {
       }
     }
     return armWeights.size() - 1;
+  }
+
+  @Override
+  public String toString() {
+    String weights = "weights: (" + Joiner.on(", ").join(getArmWeights()) + ")";
+    String winningArm = "unknown";
+    if (getVictoriousArm().isPresent()) {
+      winningArm += getVictoriousArm().get();
+    }
+    return weights + ", winner: " + winningArm;
   }
 }

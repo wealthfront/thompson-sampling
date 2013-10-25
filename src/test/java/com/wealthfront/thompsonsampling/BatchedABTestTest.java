@@ -15,7 +15,8 @@ public class BatchedABTestTest {
     int correct = 0;
     for (int i = 0; i<= 10000; i++) {
       RandomEngine engine = new MersenneTwister(i);
-      BatchedABTest batchedBandit = new BatchedABTest(2);
+      BanditPerformance performance = new BanditPerformance(2);
+      BatchedABTest batchedBandit = new BatchedABTest();
       batchedBandit.setRandomEngine(engine);
       BatchedBanditTester tester = new BatchedBanditTester(batchedBandit, engine);
       if (i % 100 == 0) {
@@ -28,17 +29,20 @@ public class BatchedABTestTest {
 
   @Test
   public void testChiSquareComputation() {
-    BatchedABTest batchedABTest = new BatchedABTest(Lists.newArrayList(new ObservedArmPerformance(100L, 0L),
+    BanditPerformance performance = new BanditPerformance(Lists.newArrayList(new ObservedArmPerformance(100L, 0L),
         new ObservedArmPerformance(0L, 100L)));
+    BatchedABTest batchedABTest = new BatchedABTest();
     batchedABTest.setRequiresMinSamples(false);
-    assertEquals(new Integer(0), batchedABTest.getBanditStatistics().getVictoriousArm().get());
-    batchedABTest = new BatchedABTest(Lists.newArrayList(new ObservedArmPerformance(0L, 100L),
+    assertEquals(new Integer(0), batchedABTest.getBanditStatistics(performance).getVictoriousArm().get());
+    performance = new BanditPerformance(Lists.newArrayList(new ObservedArmPerformance(0L, 100L),
         new ObservedArmPerformance(100L, 0L)));
+    batchedABTest = new BatchedABTest();
     batchedABTest.setRequiresMinSamples(false);
-    assertEquals(new Integer(1), batchedABTest.getBanditStatistics().getVictoriousArm().get());
-    batchedABTest = new BatchedABTest(Lists.newArrayList(new ObservedArmPerformance(5L, 5L),
+    assertEquals(new Integer(1), batchedABTest.getBanditStatistics(performance).getVictoriousArm().get());
+    performance = new BanditPerformance(Lists.newArrayList(new ObservedArmPerformance(5L, 5L),
         new ObservedArmPerformance(5L, 5L)));
+    batchedABTest = new BatchedABTest();
     batchedABTest.setRequiresMinSamples(false);
-    assertFalse(batchedABTest.getBanditStatistics().getVictoriousArm().isPresent());
+    assertFalse(batchedABTest.getBanditStatistics(performance).getVictoriousArm().isPresent());
   }
 }

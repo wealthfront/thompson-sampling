@@ -12,20 +12,12 @@ import org.apache.commons.math3.stat.descriptive.rank.Percentile;
 import java.util.Date;
 import java.util.List;
 
-public class BatchedThompsonSampling extends BaseBatchedBandit {
+public class BatchedThompsonSampling implements BatchedBandit {
   private int numberOfDraws = 10000;
   private RandomEngine randomEngine = new MersenneTwister(new Date());
   private double confidenceLevel = 0.95;
   private double experimentValueQuitLevel = 0.01;
   private int minimumConversionsPerArm = 5;
-
-  public BatchedThompsonSampling(List<ObservedArmPerformance> performances) {
-    super(performances);
-  }
-
-  public BatchedThompsonSampling(int numberOfArms) {
-    super(numberOfArms);
-  }
 
   public RandomEngine getRandomEngine() {
     return randomEngine;
@@ -68,7 +60,8 @@ public class BatchedThompsonSampling extends BaseBatchedBandit {
   }
 
   @Override
-  public BanditStatistics getBanditStatistics() {
+  public BanditStatistics getBanditStatistics(BanditPerformance performance) {
+    List<ObservedArmPerformance> performances = performance.getPerformances();
     int n = performances.size();
     List<Beta> pdfs = FluentIterable.from(performances).transform(new Function<ObservedArmPerformance, Beta>() {
       @Override

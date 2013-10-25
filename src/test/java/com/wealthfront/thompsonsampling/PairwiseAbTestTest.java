@@ -22,7 +22,7 @@ public class PairwiseAbTestTest {
         return new BernouliArm(aDouble, engine);
       }
     }).toList();
-    BatchedBanditTester tester = new BatchedBanditTester(new PairwiseAbTest(6), engine, armWeights);
+    BatchedBanditTester tester = new BatchedBanditTester(new PairwiseAbTest(), engine, armWeights);
     assertEquals(1, tester.getWinningArm());
     weights = Lists.newArrayList(0.04, 0.02, 0.045, 0.03, 0.05, 0.035);
     armWeights = FluentIterable.from(weights).transform(new Function<Double, BernouliArm>() {
@@ -31,7 +31,7 @@ public class PairwiseAbTestTest {
         return new BernouliArm(aDouble, engine);
       }
     }).toList();
-    tester = new BatchedBanditTester(new PairwiseAbTest(6), engine, armWeights);
+    tester = new BatchedBanditTester(new PairwiseAbTest(), engine, armWeights);
     assertEquals(4, tester.getWinningArm());
   }
 }
