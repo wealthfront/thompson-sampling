@@ -4,3 +4,10 @@
 *.jar
 *.war
 *.ear
+
+# IntelliJ IDEA Files #
+.idea/
+*.iml
+
+# Maven-Generated Files #
+target/
