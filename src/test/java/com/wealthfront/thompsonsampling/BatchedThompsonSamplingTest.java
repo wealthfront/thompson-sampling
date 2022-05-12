@@ -1,120 +1,99 @@
 package com.wealthfront.thompsonsampling;
 
-import cern.jet.random.engine.MersenneTwister;
-import cern.jet.random.engine.RandomEngine;
-import com.google.common.collect.Lists;
-import org.junit.Ignore;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+
+import java.util.List;
+
 import org.junit.Test;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 
-import static org.junit.Assert.*;
-import static java.lang.Math.max;
-import static java.lang.Math.min;
+import cern.jet.random.engine.MersenneTwister;
+import cern.jet.random.engine.RandomEngine;
 
 public class BatchedThompsonSamplingTest {
+
   @Test
-  public void testUpdate() {
-    BanditPerformance performance = new BanditPerformance(2);
-    BatchedThompsonSampling bandit = new BatchedThompsonSampling();
-    performance.update(Lists.newArrayList(new ObservedArmPerformance(1, 2), new ObservedArmPerformance(3, 4)));
-    assertEquals(Lists.newArrayList(new ObservedArmPerformance(1, 2), new ObservedArmPerformance(3, 4)), performance.getPerformances());
-    performance.update(Lists.newArrayList(new ObservedArmPerformance(1, 2), new ObservedArmPerformance(3, 4)));
-    assertEquals(Lists.newArrayList(new ObservedArmPerformance(2, 4), new ObservedArmPerformance(6, 8)), performance.getPerformances());
-    try {
-      performance.update(Lists.newArrayList(new ObservedArmPerformance(1, 2), new ObservedArmPerformance(3, 4), new ObservedArmPerformance(5, 6)));
-      fail("Expecting IllegalArgumentException");
-    } catch (IllegalArgumentException e) { }
+  public void getBanditStatistics() {
+    List<ObservedArmPerformance> armPerformances = ImmutableList.of(
+        new ObservedArmPerformance("a", 100, 100),
+        new ObservedArmPerformance("b", 99, 101));
+
+    BanditPerformance banditPerformance = new BanditPerformance(armPerformances);
+    BanditStatistics banditStatistics = getBandit(new MersenneTwister(1), 10, 0.90, 0.01)
+        .getBanditStatistics(banditPerformance);
+    assertEquals(ImmutableMap.of("a", 0.6, "b", 0.4), banditStatistics.getWeightsByVariant());
+    assertFalse(banditStatistics.getVictoriousVariant().isPresent());
   }
 
   @Test
-  @Ignore
-  public void testCorrectArmChosen() {
-    int correct = 0;
-    for (int i = 0; i< 10000; i++) {
-      RandomEngine engine = new MersenneTwister(i);
-      BatchedThompsonSampling batchedBandit = new BatchedThompsonSampling();
-      batchedBandit.setRandomEngine(engine);
-      BatchedBanditTester tester = new BatchedBanditTester(batchedBandit, engine);
-      if (i % 100 == 0) {
-        System.out.println("Batches complete " + i);
+  public void getBanditStatistics_withWinner_fromWeights() {
+    List<ObservedArmPerformance> armPerformances = ImmutableList.of(
+        new ObservedArmPerformance("a", 130, 100),
+        new ObservedArmPerformance("b", 90, 120));
+
+    BanditPerformance banditPerformance = new BanditPerformance(armPerformances);
+    BanditStatistics banditStatistics = getBandit(new MersenneTwister(1), 5, 0.75, 0.01)
+        .getBanditStatistics(banditPerformance);
+    assertEquals(ImmutableMap.of("a", 1.0, "b", 0.0), banditStatistics.getWeightsByVariant());
+    assertEquals("a", banditStatistics.getVictoriousVariant().get());
+  }
+
+  @Test
+  public void getBanditStatistics_withWinner_fromQuitValue() {
+    List<ObservedArmPerformance> armPerformances = ImmutableList.of(
+        new ObservedArmPerformance("a", 10, 10),
+        new ObservedArmPerformance("b", 9, 11));
+
+    BanditPerformance banditPerformance = new BanditPerformance(armPerformances);
+    BanditStatistics banditStatistics = getBandit(new MersenneTwister(1), 5, 0.90, 2.0)
+        .getBanditStatistics(banditPerformance);
+    assertEquals(ImmutableMap.of("a", 0.4, "b", 0.6), banditStatistics.getWeightsByVariant());
+    assertEquals("b", banditStatistics.getVictoriousVariant().get());
+  }
+
+  @Test
+  public void getProbabilityDensityFunctions() {
+    List<ObservedArmPerformance> armPerformances = ImmutableList.of(
+        new ObservedArmPerformance("a", 10, 10),
+        new ObservedArmPerformance("b", 9, 11),
+        new ObservedArmPerformance("c", 8, 12));
+
+    assertEquals(3, getBandit().getProbabilityDensityFunctions(armPerformances).size());
+  }
+
+  private BatchedThompsonSampling getBandit() {
+    return new BatchedThompsonSampling();
+  }
+
+  private BatchedThompsonSampling getBandit(
+      RandomEngine randomEngine,
+      int numberOfDraws,
+      double confidenceLevel,
+      double experimentValueQuitLevel) {
+    return new BatchedThompsonSampling() {
+      @Override
+      public RandomEngine getRandomEngine() {
+        return randomEngine;
       }
-      correct += tester.getWinningArm();
-    }
-    System.out.println(correct);
-    assertTrue(correct > 9500);
+
+      @Override
+      public int getNumberOfDraws() {
+        return numberOfDraws;
+      }
+
+      @Override
+      public double getConfidenceLevel() {
+        return confidenceLevel;
+      }
+
+      @Override
+      public double getExperimentValueQuitLevel() {
+        return experimentValueQuitLevel;
+      }
+    };
   }
 
-  @Test
-  public void testPerformance() {
-    int maxBanditIterations = 0;
-    double maxBanditRegret = 0.0;
-    for (int i = 51; i<= 60; i++) {
-      RandomEngine engine = new MersenneTwister(i);
-      BanditPerformance performance = new BanditPerformance(2);
-      BatchedThompsonSampling batchedBandit = new BatchedThompsonSampling();
-      batchedBandit.setRandomEngine(engine);
-      BatchedBanditTester tester = new BatchedBanditTester(batchedBandit, engine);
-      double regret = performance.cumulativeRegret(0.015, Lists.newArrayList(0.01, 0.015));
-      maxBanditIterations = max(maxBanditIterations, tester.getIterations());
-      maxBanditRegret = max(maxBanditRegret, regret);
-      assertEquals(1, tester.getWinningArm());
-    }
-    int minAbIterations = Integer.MAX_VALUE;
-    double minAbRegret = Double.MAX_VALUE;
-    for (int i = 51; i<= 60; i++) {
-      RandomEngine engine = new MersenneTwister(i);
-      BanditPerformance performance = new BanditPerformance(2);
-      BatchedABTest batchedBandit = new BatchedABTest();
-      batchedBandit.setRandomEngine(engine);
-      BatchedBanditTester tester = new BatchedBanditTester(batchedBandit, engine);
-      double regret = performance.cumulativeRegret(0.015, Lists.newArrayList(0.01, 0.015));
-      minAbIterations = min(minAbIterations, tester.getIterations());
-      minAbRegret = min(minAbRegret, regret);
-      assertEquals(1, tester.getWinningArm());
-    }
-  }
-
-  @Test
-  public void testPerformance2() {
-    int maxBanditIterations = 0;
-    double maxBanditRegret = 0.0;
-    for (int i = 51; i<= 60; i++) {
-      RandomEngine engine = new MersenneTwister(i);
-      BanditPerformance performance = new BanditPerformance(6);
-      BatchedThompsonSampling batchedBandit = new BatchedThompsonSampling();
-      batchedBandit.setRandomEngine(engine);
-      BatchedBanditTester tester = new BatchedBanditTester(batchedBandit, engine,
-          Lists.newArrayList(new BernouliArm(0.04, engine),
-              new BernouliArm(0.05, engine),
-              new BernouliArm(0.045, engine),
-              new BernouliArm(0.03, engine),
-              new BernouliArm(0.02, engine),
-              new BernouliArm(0.035, engine)));
-      double regret = performance.cumulativeRegret(0.05, Lists.newArrayList(0.04, 0.05, 0.045, 0.03, 0.02, 0.035));
-      maxBanditIterations = max(maxBanditIterations, tester.getIterations());
-      maxBanditRegret = max(maxBanditRegret, regret);
-    }
-    int minAbIterations = Integer.MAX_VALUE;
-    double minAbRegret = Double.MAX_VALUE;
-    for (int i = 51; i<= 60; i++) {
-      RandomEngine engine = new MersenneTwister(i);
-      BanditPerformance performance = new BanditPerformance(6);
-      BatchedABTest batchedBandit = new BatchedABTest();
-      batchedBandit.setRandomEngine(engine);
-      BatchedBanditTester tester = new BatchedBanditTester(batchedBandit, engine,
-          Lists.newArrayList(new BernouliArm(0.04, engine),
-              new BernouliArm(0.05, engine),
-              new BernouliArm(0.045, engine),
-              new BernouliArm(0.03, engine),
-              new BernouliArm(0.02, engine),
-              new BernouliArm(0.035, engine)));
-      double regret = performance.cumulativeRegret(0.05, Lists.newArrayList(0.04, 0.05, 0.045, 0.03, 0.02, 0.35));
-      minAbIterations = min(minAbIterations, tester.getIterations());
-      minAbRegret = min(minAbRegret, regret);
-    }
-    System.out.println("Min A/B regret: " + minAbRegret);
-    System.out.println("Max Bandit regret: " + maxBanditRegret);
-    System.out.println("Min A/B # batches (batch size = 100 samples): " + minAbIterations);
-    System.out.println("Max Bandit # batches (batch size = 100 samples): " + maxBanditIterations);
-  }
 }

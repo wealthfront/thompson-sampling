@@ -1,83 +1,41 @@
 package com.wealthfront.thompsonsampling;
 
+import static java.util.stream.Collectors.toList;
+
 import cern.jet.random.Beta;
 import cern.jet.random.engine.MersenneTwister;
 import cern.jet.random.engine.RandomEngine;
-import com.google.common.base.Function;
-import com.google.common.base.Optional;
-import com.google.common.collect.FluentIterable;
-import com.google.common.collect.Lists;
+
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.math3.stat.descriptive.rank.Percentile;
 
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 public class BatchedThompsonSampling implements BatchedBandit {
-  private int numberOfDraws = 10000;
-  private RandomEngine randomEngine = new MersenneTwister(new Date());
-  private double confidenceLevel = 0.95;
-  private double experimentValueQuitLevel = 0.01;
-  private int minimumConversionsPerArm = 5;
 
-  public RandomEngine getRandomEngine() {
-    return randomEngine;
-  }
+  private static RandomEngine RANDOM_ENGINE = new MersenneTwister(new Date());
 
-  public void setRandomEngine(RandomEngine randomEngine) {
-    this.randomEngine = randomEngine;
-  }
-
-  public int getNumberOfDraws() {
-    return numberOfDraws;
-  }
-
-  public void setNumberOfDraws(int numberOfDraws) {
-    this.numberOfDraws = numberOfDraws;
-  }
-
-  public double getConfidenceLevel() {
-    return confidenceLevel;
-  }
-
-  public void setConfidenceLevel(double confidenceLevel) {
-    this.confidenceLevel = confidenceLevel;
-  }
-
-  public double getExperimentValueQuitLevel() {
-    return experimentValueQuitLevel;
-  }
-
-  public void setExperimentValueQuitLevel(double experimentValueQuitLevel) {
-    this.experimentValueQuitLevel = experimentValueQuitLevel;
-  }
-
-  public int getMinimumConversionsPerArm() {
-    return minimumConversionsPerArm;
-  }
-
-  public void setMinimumConversionsPerArm(int minimumConversionsPerArm) {
-    this.minimumConversionsPerArm = minimumConversionsPerArm;
-  }
+  private static final int NUMBER_OF_DRAWS = 10_000;
+  private static final double CONFIDENCE_LEVEL = 0.95;
+  private static final double EXPERIMENT_VALUE_QUIT_LEVEL = 0.01;
 
   @Override
   public BanditStatistics getBanditStatistics(BanditPerformance performance) {
     List<ObservedArmPerformance> performances = performance.getPerformances();
     int n = performances.size();
-    List<Beta> pdfs = FluentIterable.from(performances).transform(new Function<ObservedArmPerformance, Beta>() {
-      @Override
-      public Beta apply(ObservedArmPerformance armPerformance) {
-        double alpha = armPerformance.getSuccesses() + 1;
-        double beta = armPerformance.getFailures() + 1;
-        return new Beta(alpha, beta, randomEngine);
-      }
-    }).toList();
-    double[][] table = new double[numberOfDraws][n];
+    double[][] table = new double[getNumberOfDraws()][n];
     int[] wins = new int[n];
-    for (int i = 0; i < numberOfDraws; i++) {
+    List<Beta> probabilityDensityFunctions = getProbabilityDensityFunctions(performances);
+
+    for (int i = 0; i < getNumberOfDraws(); i++) {
       double maxValue = -1.0;
       int winningArm = -1;
       for (int j = 0; j < n; j++) {
-        Beta pdf = pdfs.get(j);
+        Beta pdf = probabilityDensityFunctions.get(j);
         table[i][j] = pdf.nextDouble();
         if (table[i][j] > maxValue) {
           maxValue = table[i][j];
@@ -86,22 +44,25 @@ public class BatchedThompsonSampling implements BatchedBandit {
       }
       wins[winningArm] += 1;
     }
-    List<Double> armWeights = Lists.newArrayList();
+
+    Map<String, Double> armWeightsByVariant = new HashMap<>();
     int bestArm = -1;
     double bestWeight = -1.0;
-    for (int j = 0; j < n; j++) {
-      double weight = (1.0 * wins[j]) / numberOfDraws;
+    for (int i = 0; i < n; i++) {
+      double weight = (1.0 * wins[i]) / getNumberOfDraws();
       if (weight > bestWeight) {
         bestWeight = weight;
-        bestArm = j;
+        bestArm = i;
       }
-      armWeights.add(weight);
+      armWeightsByVariant.put(performances.get(i).getVariantName(), weight);
     }
-    if (bestWeight > confidenceLevel) {
-      return new BanditStatistics(armWeights, Optional.of(bestArm));
+    if (bestWeight > getConfidenceLevel()) {
+      return new BanditStatistics(
+          armWeightsByVariant, Optional.of(performances.get(bestArm).getVariantName()));
     }
-    double[] valueRemaining = new double[numberOfDraws];
-    for (int i = 0; i < numberOfDraws; i++) {
+
+    double[] valueRemaining = new double[getNumberOfDraws()];
+    for (int i = 0; i < getNumberOfDraws(); i++) {
       double maxValue = -1.0;
       int winningArm = -1;
       for (int j = 0; j < n; j++) {
@@ -116,12 +77,42 @@ public class BatchedThompsonSampling implements BatchedBandit {
         valueRemaining[i] = (maxValue - table[i][bestArm]) / table[i][bestArm];
       }
     }
+
     Percentile percentile = new Percentile();
     percentile.setData(valueRemaining);
-    double likelyValueRemaining = percentile.evaluate(confidenceLevel * 100.0);
-    if (likelyValueRemaining < experimentValueQuitLevel) {
-      return new BanditStatistics(armWeights, Optional.of(bestArm));
-    }
-    return new BanditStatistics(armWeights, Optional.<Integer>absent());
+    double likelyValueRemaining = percentile.evaluate(getConfidenceLevel() * 100.0);
+    Optional<String> victoriousVariant = likelyValueRemaining < getExperimentValueQuitLevel() ?
+        Optional.of(performances.get(bestArm).getVariantName()) : Optional.empty();
+    return new BanditStatistics(armWeightsByVariant, victoriousVariant);
   }
+
+  @VisibleForTesting
+  List<Beta> getProbabilityDensityFunctions(List<ObservedArmPerformance> performances) {
+    return performances.stream().map(armPerformance -> {
+      double alpha = armPerformance.getSuccesses() + 1;
+      double beta = armPerformance.getFailures() + 1;
+      return new Beta(alpha, beta, getRandomEngine());
+    }).collect(toList());
+  }
+
+  @VisibleForTesting
+  RandomEngine getRandomEngine() {
+    return RANDOM_ENGINE;
+  }
+
+  @VisibleForTesting
+  int getNumberOfDraws() {
+    return NUMBER_OF_DRAWS;
+  }
+
+  @VisibleForTesting
+  double getConfidenceLevel() {
+    return CONFIDENCE_LEVEL;
+  }
+
+  @VisibleForTesting
+  double getExperimentValueQuitLevel() {
+    return EXPERIMENT_VALUE_QUIT_LEVEL;
+  }
+
 }
