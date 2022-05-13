@@ -1,84 +1,66 @@
 package com.wealthfront.thompsonsampling;
 
-import cern.jet.random.engine.MersenneTwister;
-import cern.jet.random.engine.RandomEngine;
-import com.google.common.base.Optional;
-import com.google.common.collect.Lists;
-
-import java.util.Date;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 import static cern.jet.stat.Probability.normalInverse;
 import static java.lang.Math.round;
 import static cern.jet.stat.Probability.chiSquare;
 import static java.lang.Math.sqrt;
+import static java.util.stream.Collectors.toMap;
+
+import com.google.common.annotations.VisibleForTesting;
 
 public class BatchedABTest implements BatchedBandit {
-  private RandomEngine randomEngine = new MersenneTwister(new Date());
-  private double confidenceLevel = 0.95;
-  private double baselineConversionRate = 0.01;
-  private double minimumDetectableEffect = 0.5;
-  private double statisticalPower = 0.80;
-  private boolean requiresMinSamples = true;
 
+  private static boolean REQUIRES_MIN_SAMPLES = true;
+  private static final double CONFIDENCE_LEVEL = 0.95;
+  private static final double BASELINE_CONVERSION_RATE = 0.01;
+  private static final double MINIMUM_DETECTABLE_EFFECT = 0.5;
+  private static final double STATISTICAL_POWER = 0.80;
+  private static final int MIN_EXPECTED_SUCCESS = 5;
+  private static final int MIN_EXPECTED_FAILURE = 5;
 
-  public RandomEngine getRandomEngine() {
-    return randomEngine;
+  @Override
+  public BanditStatistics getBanditStatistics(BanditPerformance banditPerformance) {
+    List<ObservedArmPerformance> performances = banditPerformance.getPerformances();
+    Map<String, Double> equalWeightsByVariant = getEqualWeightsByVariant(performances);
+    if (REQUIRES_MIN_SAMPLES) {
+      boolean isBelowMinimumSamples = performances.stream()
+          .anyMatch(performance -> performance.getTotal() < getMinimumNumberOfSamples());
+      if (isBelowMinimumSamples) {
+        return new BanditStatistics(getEqualWeightsByVariant(performances), Optional.empty());
+      }
+    }
+
+    MeasuredPerformance measuredPerformance = getMeasuredPerformance(performances);
+    long totalSamples = measuredPerformance.totalSuccesses + measuredPerformance.totalFailures;
+    double chiSquared = 0.0;
+    for (ObservedArmPerformance performance : performances) {
+      double samples = 1.0 * performance.getTotal();
+      double expectedFailure = samples * measuredPerformance.totalFailures / totalSamples;
+      double expectedSuccess = samples * measuredPerformance.totalSuccesses / totalSamples;
+      if (expectedFailure < MIN_EXPECTED_FAILURE || expectedSuccess < MIN_EXPECTED_SUCCESS) {
+        return new BanditStatistics(equalWeightsByVariant, Optional.empty());
+      }
+      double failFactor = square(performance.getFailures() - expectedFailure) / expectedFailure;
+      double successFactor = square(performance.getSuccesses() - expectedSuccess) / expectedSuccess;
+      chiSquared += failFactor + successFactor;
+    }
+
+    boolean includeVictoriousVariant = chiSquare(1.0, chiSquared) >= CONFIDENCE_LEVEL || REQUIRES_MIN_SAMPLES;
+    Optional<String> maybeVictoriousVariant = includeVictoriousVariant
+        ? Optional.of(measuredPerformance.bestVariant)
+        : Optional.empty();
+    return new BanditStatistics(equalWeightsByVariant, maybeVictoriousVariant);
   }
 
-  public void setRandomEngine(RandomEngine randomEngine) {
-    this.randomEngine = randomEngine;
-  }
-
-  public double getConfidenceLevel() {
-    return confidenceLevel;
-  }
-
-  public void setConfidenceLevel(double confidenceLevel) {
-    this.confidenceLevel = confidenceLevel;
-  }
-
-  public double getBaselineConversionRate() {
-    return baselineConversionRate;
-  }
-
-  public void setBaselineConversionRate(double baselineConversionRate) {
-    this.baselineConversionRate = baselineConversionRate;
-  }
-
-  public double getMinimumDetectableEffect() {
-    return minimumDetectableEffect;
-  }
-
-  public void setMinimumDetectableEffect(double minimumDetectableEffect) {
-    this.minimumDetectableEffect = minimumDetectableEffect;
-  }
-
-  public double getStatisticalPower() {
-    return statisticalPower;
-  }
-
-  public void setStatisticalPower(double statisticalPower) {
-    this.statisticalPower = statisticalPower;
-  }
-
-  public boolean requiresMinSamples() {
-    return requiresMinSamples;
-  }
-
-  public void setRequiresMinSamples(boolean requiresMinSamples) {
-    this.requiresMinSamples = requiresMinSamples;
-  }
-
-  private double square(double x) {
-    return x * x;
-  }
-
-  private int numberOfSamples() {
-    double p = baselineConversionRate;
-    double delta = baselineConversionRate * minimumDetectableEffect;
-    double alpha = 1.0 - confidenceLevel;
-    double beta = 1.0 - statisticalPower;
+  private int getMinimumNumberOfSamples() {
+    double p = BASELINE_CONVERSION_RATE;
+    double delta = BASELINE_CONVERSION_RATE * MINIMUM_DETECTABLE_EFFECT;
+    double alpha = 1.0 - CONFIDENCE_LEVEL;
+    double beta = 1.0 - STATISTICAL_POWER;
     double v1 = p * (1 - p);
     double v2 = (p + delta) * (1 - p - delta);
     double sd1 = sqrt(2 * v1);
@@ -86,67 +68,45 @@ public class BatchedABTest implements BatchedBandit {
     double tAlpha2 = normalInverse(alpha / 2.0);
     double tBeta = normalInverse(beta);
     double n = square(tAlpha2 * sd1 + tBeta * sd2) / square(delta);
-    return (int)round(n);
-   }
-
-  private List<Double> getWeights(int arms) {
-    List<Double> weights = Lists.newArrayListWithCapacity(arms);
-    for (int i = 0; i < arms; i++) {
-      weights.add(1.0 / arms);
-    }
-    return weights;
+    return (int) round(n);
   }
 
-  @Override
-  public BanditStatistics getBanditStatistics(BanditPerformance performance) {
-    List<ObservedArmPerformance> performances = performance.getPerformances();
-    if (requiresMinSamples) {
-      int n = numberOfSamples();
-      for (ObservedArmPerformance p : performances) {
-        if (p.getFailures() + p.getSuccesses() < n) {
-          return new BanditStatistics(getWeights(performances.size()), Optional.<Integer>absent());
-        }
+  private double square(double x) {
+    return x * x;
+  }
+
+  private Map<String, Double> getEqualWeightsByVariant(List<ObservedArmPerformance> performances) {
+    double equalWeight = 1.0 / performances.size();
+    return performances.stream()
+        .collect(toMap(ObservedArmPerformance::getVariantName, x -> equalWeight));
+  }
+
+  private MeasuredPerformance getMeasuredPerformance(List<ObservedArmPerformance> performances) {
+    MeasuredPerformance measuredPerformance = new MeasuredPerformance();
+    performances.forEach(performance -> {
+      measuredPerformance.totalSuccesses += performance.getSuccesses();
+      measuredPerformance.totalFailures += performance.getFailures();
+      double conversion = performance.getSuccesses() * 1.0 / (performance.getFailures() + performance.getSuccesses());
+      if (conversion > measuredPerformance.bestConversion) {
+        measuredPerformance.bestConversion = conversion;
+        measuredPerformance.bestVariant = performance.getVariantName();
       }
-    }
-    int t = performances.size();
-    int bestArm = -1;
+    });
+    return measuredPerformance;
+  }
+
+  @VisibleForTesting
+  void setRequiresMinSamples(boolean requiresMinSamples) {
+    REQUIRES_MIN_SAMPLES = requiresMinSamples;
+  }
+
+  private static class MeasuredPerformance {
+
+    String bestVariant;
     double bestConversion = -1.0;
-    List<Long> groupTotals = Lists.newArrayList();
     long totalSuccesses = 0;
     long totalFailures = 0;
-    for (int i = 0; i < t; i++) {
-      ObservedArmPerformance p = performances.get(i);
-      totalSuccesses += p.getSuccesses();
-      totalFailures += p.getFailures();
-      long total = totalSuccesses + totalFailures;
-      groupTotals.add(total);
-      double conversion = p.getSuccesses() * 1.0 / (p.getFailures() + p.getSuccesses());
-      if (conversion > bestConversion) {
-        bestConversion = conversion;
-        bestArm = i;
-      }
-    }
-    long totalSamples = totalSuccesses + totalFailures;
-    double chiSquared = 0.0;
-    for (int i = 0; i < t; i++) {
-      ObservedArmPerformance p = performances.get(i);
-      double samples = 1.0 * (p.getFailures() + p.getSuccesses());
-      double expectedFailure = samples * totalFailures / totalSamples;
-      double expectedSuccess = samples * totalSuccesses / totalSamples;
-      if (expectedFailure < 5 || expectedSuccess < 5) {
-        return new BanditStatistics(getWeights(performances.size()), Optional.<Integer>absent());
-      }
-      double failFactor = square(p.getFailures() - expectedFailure) / expectedFailure;
-      double successFactor = square(p.getSuccesses() - expectedSuccess) / expectedSuccess;
-      chiSquared += failFactor + successFactor;
-    }
-    if (chiSquare(1.0, chiSquared) >= confidenceLevel) {
-      return new BanditStatistics(getWeights(performances.size()), Optional.of(bestArm));
-    }
-    if (requiresMinSamples) {
-      return new BanditStatistics(getWeights(performances.size()), Optional.of(bestArm));
-    } else {
-      return new BanditStatistics(getWeights(performances.size()), Optional.<Integer>absent());
-    }
+
   }
+
 }
